@@ -1,6 +1,8 @@
 %{
+#include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 /* yyscan_t is an opaque pointer, a typedef is required here to break a
    circular dependency introduced with bison 2.6 (normally a typedef is
@@ -10,12 +12,17 @@
 
 typedef void *yyscan_t;
 
+#include "idl/priv/tools.h"
+
 #include "idl.parser.h"
 #include "yy_decl.h" /* prevent implicit declaration of yylex */
 
 int
 yyerror(
   YYLTYPE *yylloc, yyscan_t yyscanner, idl_context_t *context, char *text);
+
+static int
+idl_parser_token_matches_keyword(const char *token);
 %}
 
 
@@ -41,19 +48,23 @@ typedef struct idl_context idl_context_t;
 
 %define api.pure full
 %define api.prefix {idl_parser_}
+%define parse.trace
 
 %locations
 %param {yyscan_t scanner}
 %param {idl_context_t *context}
 
+%token-table
 
 %start const_dcl
+
+%token <identifier>
+  IDENTIFIER
 
 %token <literal>
   BOOLEAN_LITERAL
   CHARACTER_LITERAL
   WIDE_CHARACTER_LITERAL
-  IDENTIFIER
   STRING_LITERAL
   WIDE_STRING_LITERAL
   INTEGER_LITERAL
@@ -76,22 +87,28 @@ typedef struct idl_context idl_context_t;
 %type <boolean>
   unsigned
 
+%type <identifier> identifier
+
 /* operators */
 %token LSHIFT RSHIFT
 
 /* keywords */
-%token CONST
-%token UNSIGNED
+%token CONST "const"
+%token NATIVE "native"
+%token STRUCT "struct"
+%token TYPEDEF "typedef"
+%token UNION "union"
+%token UNSIGNED "unsigned"
 
-%token FLOAT
-%token DOUBLE
-%token SHORT
-%token LONG
-%token CHAR
-%token WCHAR
-%token BOOLEAN
-%token OCTET
-%token ANY
+%token FLOAT "float"
+%token DOUBLE "double"
+%token SHORT "short"
+%token LONG "long"
+%token CHAR "char"
+%token WCHAR "wchar"
+%token BOOLEAN "boolean"
+%token OCTET "octet"
+%token ANY "any"
 
 
 %%
@@ -99,7 +116,7 @@ typedef struct idl_context idl_context_t;
 /* Constant Declaration */
 
 const_dcl:
-    CONST const_type IDENTIFIER '=' const_exp
+    CONST const_type identifier '=' const_exp
       { printf("const_type is of: %d\n", $2); }
   ;
 
@@ -137,9 +154,9 @@ and_expr:
 
 shift_expr:
     add_expr
-  | shift_expr RSHIFT add_expr
+  | shift_expr "<<" add_expr
       { }
-  | shift_expr LSHIFT add_expr
+  | shift_expr ">>" add_expr
       { };
 
 add_expr:
@@ -218,6 +235,23 @@ octet_type:
     ANY { $$ = idl_any; };*/
 
 
+identifier:
+    IDENTIFIER
+      {
+        size_t offset = 0;
+        if ($1[0] == '_') {
+          offset = 1;
+        } else if (idl_parser_token_matches_keyword($1) == 0) {
+          /* FIXME: come up with a better error message */
+          yyerror(&yylloc, scanner, context, "Identifier matches a keyword");
+          YYABORT;
+        } else if (($$ = strdup($1 + offset)) == NULL) {
+          /* FIXME: come up with a better error message */
+          yyerror(&yylloc, scanner, context, "Memory exhausted");
+          YYABORT;
+        }
+      };
+
 %%
 
 int
@@ -226,6 +260,27 @@ yyerror(
 {
   /* FIXME: implement */
   fprintf(stderr, "ERROR: %s\n", text);
+  return 0;
+}
+
+static int
+idl_parser_token_matches_keyword(const char *token)
+{
+  size_t i, n;
+
+  assert(token != NULL);
+
+  for (i = 0, n = strlen(token); i < YYNTOKENS; i++) {
+    if (yytname[i] != 0
+        && yytname[i][    0] == '"'
+        && idl_strncasecmp_c(yytname[i] + 1, token, n) == 0
+        && yytname[i][n + 1] == '"'
+        && yytname[i][n + 2] == 0)
+    {
+      return 1;
+    }
+  }
+
   return 0;
 }
 

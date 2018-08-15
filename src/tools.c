@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "idl/priv/tools.h"
+
 static int
 tolower_c(int c)
 {
@@ -37,9 +39,10 @@ isxdigit_c(int c)
   return 0;
 }
 
-/* FIXME: probably not needed anymore */
+#define lc(c) tolower_c(c)
+
 int
-idl_strcasecmp(const char *s1, const char *s2)
+idl_strcasecmp_c(const char *s1, const char *s2)
 {
   int eq;
 
@@ -55,6 +58,27 @@ idl_strcasecmp(const char *s1, const char *s2)
 
   return eq;
 }
+
+int
+idl_strncasecmp_c(const char *s1, const char *s2, size_t n)
+{
+  size_t i;
+  int eq = 0;
+
+  assert(s1 != NULL);
+  assert(s2 != NULL);
+
+  for (i = 0;
+       i < n && (eq = lc(s1[i]) - lc(s2[i])) == 0 && s1[i] && s2[i];
+       i++)
+  {
+    /* do nothing */
+  }
+
+  return eq;
+}
+
+#undef lc
 
 int
 idl_unescape_char(const char *str, char **endptr)

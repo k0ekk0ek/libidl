@@ -27,7 +27,7 @@
         } \
     }
 
-#include "tools.h"
+#include "idl/priv/tools.h"
 %}
 
 %x MULTILINE_COMMENT
@@ -60,8 +60,8 @@ identifier                [a-zA-Z_][a-zA-Z0-9_]*
 [ \t\r]                   { }
 [\n]                      { }
 
-"<""<"                    { return(LSHIFT); }
-">"">"                    { return(RSHIFT); }
+"<<"                      { return(LSHIFT); }
+">>"                      { return(RSHIFT); }
 
 "/*"                      { BEGIN(MULTILINE_COMMENT); }
 <MULTILINE_COMMENT>.      { }
@@ -150,7 +150,7 @@ FALSE                     {
 <STRING>"\""              { BEGIN(INITIAL); }
 
 {identifier}              {
-                            yylval->identifier = strdup(yytext + (size_t)(yytext[0] == '_'));
+                            yylval->identifier = strdup(yytext);
                             if (yylval->identifier == NULL) {
                               perror("Could not copy identifier"); /* FIXME: use yyerror */
                             }
